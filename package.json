@@ -16,6 +16,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@clerk/nextjs": "^6.23.1",
     "@prisma/client": "^6.10.1",
     "@prisma/extension-accelerate": "^2.0.1",
     "class-variance-authority": "^0.7.1",
