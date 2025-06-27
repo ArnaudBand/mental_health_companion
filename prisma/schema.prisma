@@ -13,3 +13,361 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+// User model - represents app users
+model User {
+  id              String    @id @default(uuid())
+  clerkId         String?   @unique // Clerk user ID
+  email           String    @unique
+  firstName       String?
+  lastName        String?
+  username        String?   @unique
+  avatar          String?
+  isAnonymous     Boolean   @default(false)
+  
+  // User preferences
+  language        String    @default("en")
+  timezone        String    @default("UTC")
+  isEnabledNotifications   Boolean   @default(true)
+  
+  // Crisis prevention
+  emergencyContact String?
+  emergencyContactEnabled Boolean @default(false)
+  
+  // Timestamps
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  lastActiveAt    DateTime  @default(now())
+  
+  // Relations
+  moods           Mood[]
+  chatSessions    ChatSession[]
+  goals           Goal[]
+  insights        Insight[]
+  notifications   Notification[]
+  
+  @@map("users")
+}
+
+// Mood tracking model
+model Mood {
+  id          String     @id @default(uuid())
+  userId      String
+  
+  // Mood data
+  level       Int        // 1-5 scale (1 = very sad, 5 = very happy)
+  emoji       String?    // Emoji representation
+  note        String?    @db.Text
+  energy      Int?       // 1-5 energy level
+  anxiety     Int?       // 1-5 anxiety level
+  sleep       Int?       // Hours of sleep
+  
+  // Context
+  tags        String[]   // ["work", "family", "health"]
+  activities  String[]   // ["exercise", "meditation", "socializing"]
+  triggers    String[]   // ["stress", "loneliness", "fatigue"]
+  
+  // AI Analysis
+  aiAnalysis  String?    @db.Text
+  sentiment   Float?     // -1 to 1 sentiment score
+  
+  // Timestamps
+  recordedAt  DateTime   @default(now())
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  
+  // Relations
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("moods")
+  @@index([userId, recordedAt])
+}
+
+// Chat sessions with AI
+model ChatSession {
+  id            String      @id @default(uuid())
+  userId        String
+  
+  // Session metadata
+  title         String?     @default("Chat Session")
+  isActive      Boolean     @default(true)
+  sessionType   SessionType @default(GENERAL)
+  
+  // Crisis detection
+  riskLevel     RiskLevel   @default(LOW)
+  flaggedAt     DateTime?
+  reviewedAt    DateTime?
+  reviewedBy    String?
+  
+  // AI Model info
+  model         String      @default("gpt-4")
+  systemPrompt  String?     @db.Text
+  
+  // Timestamps
+  startedAt     DateTime    @default(now())
+  endedAt       DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  // Relations
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages      Message[]
+  
+  @@map("chat_sessions")
+  @@index([userId, createdAt])
+}
+
+// Individual chat messages
+model Message {
+  id            String      @id @default(uuid())
+  sessionId     String
+  
+  // Message content
+  content       String      @db.Text
+  role          MessageRole // USER, ASSISTANT, SYSTEM
+  
+  // AI metadata
+  model         String?
+  tokenCount    Int?
+  responseTime  Int?        // milliseconds
+  
+  // Crisis detection
+  flagged       Boolean     @default(false)
+  flagReason    String?
+  sentiment     Float?      // -1 to 1 sentiment score
+  
+  // Timestamps
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  // Relations
+  session       ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  
+  @@map("messages")
+  @@index([sessionId, createdAt])
+}
+
+// User goals and progress tracking
+model Goal {
+  id          String     @id @default(uuid())
+  userId      String
+  
+  // Goal details
+  title       String
+  description String?    @db.Text
+  category    GoalCategory
+  targetValue Int?       // For quantifiable goals
+  currentValue Int?      @default(0)
+  unit        String?    // "days", "times", "hours"
+  
+  // Status
+  status      GoalStatus @default(ACTIVE)
+  priority    Priority   @default(MEDIUM)
+  
+  // Dates
+  startDate   DateTime   @default(now())
+  targetDate  DateTime?
+  completedAt DateTime?
+  
+  // Relations
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  checkIns    GoalCheckIn[]
+  
+  // Timestamps
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  
+  @@map("goals")
+  @@index([userId, status])
+}
+
+// Goal progress check-ins
+model GoalCheckIn {
+  id          String   @id @default(uuid())
+  goalId      String
+  
+  // Progress data
+  value       Int      // Progress made
+  note        String?  @db.Text
+  feeling     Int?     // 1-5 how they feel about progress
+  
+  // Timestamps
+  recordedAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  
+  // Relations
+  goal        Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  
+  @@map("goal_checkins")
+  @@index([goalId, recordedAt])
+}
+
+// AI-generated insights and recommendations
+model Insight {
+  id          String      @id @default(uuid())
+  userId      String
+  
+  // Insight content
+  title       String
+  content     String      @db.Text
+  type        InsightType
+  category    String?     // "mood", "sleep", "activity"
+  
+  // Metadata
+  confidence  Float?      // 0-1 confidence score
+  basedOn     String[]    // ["mood_trends", "chat_analysis"]
+  
+  // User interaction
+  isRead      Boolean     @default(false)
+  isHelpful   Boolean?
+  feedback    String?
+  
+  // Timestamps
+  generatedAt DateTime    @default(now())
+  expiresAt   DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  
+  // Relations
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("insights")
+  @@index([userId, generatedAt])
+}
+
+// User notifications
+model Notification {
+  id        String            @id @default(uuid())
+  userId    String
+  
+  // Notification content
+  title     String
+  message   String            @db.Text
+  type      NotificationType
+  priority  Priority          @default(MEDIUM)
+  
+  // Metadata
+  data      Json?             // Additional data
+  
+  // Status
+  isRead    Boolean           @default(false)
+  readAt    DateTime?
+  
+  // Scheduling
+  scheduledFor DateTime?
+  sentAt    DateTime?
+  
+  // Timestamps
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  
+  // Relations
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("notifications")
+  @@index([userId, isRead])
+}
+
+// Analytics and usage tracking
+model Analytics {
+  id            String   @id @default(uuid())
+  userId        String?  // Null for anonymous analytics
+  
+  // Event data
+  event         String   // "chat_started", "mood_logged", "goal_created"
+  category      String?  // "engagement", "feature_usage", "performance"
+  properties    Json?    // Additional event properties
+  
+  // Session data
+  sessionId     String?
+  userAgent     String?
+  ipAddress     String?
+  country       String?
+  
+  // Timestamps
+  timestamp     DateTime @default(now())
+  createdAt     DateTime @default(now())
+  
+  @@map("analytics")
+  @@index([event, timestamp])
+  @@index([userId, timestamp])
+}
+
+// System configuration and feature flags
+model SystemConfig {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       String   @db.Text
+  type        String   @default("string") // "string", "number", "boolean", "json"
+  description String?  @db.Text
+  
+  // Timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("system_config")
+}
+
+// Enums
+enum SessionType {
+  GENERAL
+  CRISIS
+  THERAPY
+  MEDITATION
+  GOAL_SETTING
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+enum GoalCategory {
+  MENTAL_HEALTH
+  PHYSICAL_HEALTH
+  RELATIONSHIPS
+  WORK
+  PERSONAL_GROWTH
+  HABITS
+  OTHER
+}
+
+enum GoalStatus {
+  ACTIVE
+  COMPLETED
+  PAUSED
+  CANCELLED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum InsightType {
+  TREND
+  RECOMMENDATION
+  WARNING
+  ACHIEVEMENT
+  TIP
+}
+
+enum NotificationType {
+  REMINDER
+  ACHIEVEMENT
+  INSIGHT
+  CRISIS_ALERT
+  SYSTEM
+  MARKETING
+}
+
