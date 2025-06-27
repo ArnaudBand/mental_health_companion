@@ -12,7 +12,7 @@
     "migrate": "prisma migrate dev --name init",
     "generate": "prisma generate",
     "push": "prisma db push",
-    "prepare": "husky install",
+    "prepare": "husky",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
