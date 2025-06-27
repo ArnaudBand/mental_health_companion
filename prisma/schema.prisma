@@ -6,7 +6,7 @@
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../node-modules/@mental-health-companion/prisma-client"
+  output   = "../node_modules/@mental-health-companion/prisma-client"
 }
 
 datasource db {
